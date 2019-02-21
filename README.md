@@ -11,9 +11,9 @@
 This template provides Automated Lustre server deployment on Azure and create Lustre filesystem.
 
 # Components
-CentOS 7.6
-Lustre-2.12.0
-Clustered OSS/OST and MDS/MDT
+- CentOS 7.6
+- Lustre-2.12.0
+- Clustered OSS/OST and MDS/MDT with ldiskfs
 
 ---
 # Original code and refferences
