@@ -2,6 +2,16 @@
 	"$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
 	"contentVersion": "1.0.0.0",
 	"parameters": {
+		"hostOs": {
+			"type": "string",
+			"defaultValue": "abcd",
+			"allowedValues": [
+				"abcd"
+			],
+			"metadata": {
+				"description": "OS to install on the host system (Centos was removed due to breaking change)"
+			}
+		},
 		"artifactsBaseUrl": {
 			"type": "string",
 			"defaultValue": "https://raw.githubusercontent.com/DDNStorage/lustre-on-azure/master/",
@@ -47,7 +57,7 @@
 		},
 		"adminPassword": {
 			"type": "securestring",
-			"defaultValue": "123Password!",
+			"defaultValue": "",
 			"metadata": {
 				"description": "Admin password for the virtual machines"
 			}
@@ -68,25 +78,25 @@
 		},
 		"mgsVmSize": {
 			"type": "string",
-			"defaultValue": "Standard_D32s_v3",
+			"defaultValue": "Basic_A1",
 			"metadata": {
 				"description": "Size of the Management Server (MGS) that stores configuration information for all Lustre filesystems in a cluster."
 
 			},
 			"allowedValues": [
-				"Standard_D4s_v4",
-				"Standard_D32s_v3"
+				"Basic_A1",
+				"Basic_A2"
 			]
 		},
 		"mdsVmSize": {
 			"type": "string",
-			"defaultValue": "Standard_D32s_v3",
+			"defaultValue": "Basic_A1",
 			"metadata": {
 				"description": "Size of the Metadata Server (MDS) that makes metadata (e.g. files, directories, permissions) available to Lustre clients"
 			},
 			"allowedValues": [
-				"Standard_D4s_v4",
-				"Standard_D32s_v3"
+				"Basic_A1",
+				"Basic_A2"
 			]
 		},
 		"mdsCount": {
@@ -116,13 +126,13 @@
 		},
 		"ossVmSize": {
 			"type": "string",
-			"defaultValue": "Standard_D32s_v3",
+			"defaultValue": "Basic_A1",
 			"metadata": {
 				"description": "Size of the Object Storage Server (OSS) that provides file I/O service and network request handling for one or more attached disks referred to as Object Storage Target (OST)"
 			},
 			"allowedValues": [
-				"Standard_D4s_v4",
-				"Standard_D32s_v3"
+				"Basic_A1",
+				"Basic_A2"
 			]
 		},
 		"ossCount": {
@@ -134,7 +144,7 @@
 		},
 		"ostCount": {
 			"type": "int",
-			"defaultValue": 2,
+			"defaultValue": 1,
 			"allowedValues": [
 				1,
 				2,
@@ -160,7 +170,7 @@
 		},
 		"existingVnetResourceGroup": {
 			"type": "string",
-			"defaultValue": "[resourceGroup().name]",
+			"defaultValue": "ddnrg",
 			"metadata": {
 				"description": "Virtual Network Resource Group for cases when Lustre nodes are deployed into an existing VNet"
 			}
@@ -211,6 +221,11 @@
 		// 	"faultDomainCount": "1",
 		// 	"updateDomainCount": "1"
 		// },
+		"imageReference": {
+			"abcd": {
+				"id": "[resourceId('Microsoft.Compute/images', 'abcd')]"
+			}
+		},
 		"baseUrl": "[concat(parameters('artifactsBaseUrl'),'/')]",
 		"scriptUrlLustre": "[concat(variables('baseUrl'),'lustre.sh')]",
 		"templateUrlVnet": "[concat(variables('baseUrl'),'vnet-',parameters('vnetNewOrExisting'),'.json')]",
@@ -268,19 +283,12 @@
 			}
 		},
 		{
-			"apiVersion": "2017-08-01",
+			"apiVersion": "2015-06-15",
 			"type": "Microsoft.Network/publicIPAddresses",
 			"name": "[concat(parameters('vmNamePrefix'),'-mgs')]",
 			"location": "[parameters('location')]",
-			"sku": {
-				"name": "Standard",
-				"tier": "Regional"
-			},
-			"zones": [
-				"1"
-			],
 			"properties": {
-				"publicIPAllocationMethod": "Static",
+				"publicIPAllocationMethod": "Dynamic",
 				"idleTimeoutInMinutes": 4,
 				"dnsSettings": {
 					"domainNameLabel": "[concat(parameters('dnsNamePrefix'),'')]"
@@ -314,16 +322,13 @@
 			}
 		},
 		{
+			"apiVersion": "2017-03-30",
 			"type": "Microsoft.Compute/virtualMachines",
-			"apiVersion": "2019-07-01",
 			"name": "[concat(parameters('vmNamePrefix'),'-mgs')]",
 			"location": "[parameters('location')]",
 			"dependsOn": [
 				"storageAccountsCopy",
 				"[concat('Microsoft.Network/networkInterfaces/', parameters('vmNamePrefix'), '-mgs')]"
-			],
-			"zones": [
-				"1"
 			],
 			"tags": {
 				"LustreType": "mgt"
@@ -332,36 +337,38 @@
 				"hardwareProfile": {
 					"vmSize": "[parameters('mgsVmSize')]"
 				},
-				"storageProfile": {
-					"imageReference": {
-						"publisher": "OpenLogic",
-						"offer": "CentOS",
-						"sku": "8_2",
-						"version": "latest"
-					},
-					"osDisk": {
-						"osType": "Linux",
-						"name": "[concat(parameters('vmNamePrefix'), '-mgs', '_OSDisk')]",
-						"createOption": "FromImage",
-						"caching": "ReadWrite"
-					},
-					"dataDisks": [
-						{
-							"lun": 0,
-							"name": "[concat(parameters('vmNamePrefix'), '-mgs', '_DataDisk1')]",
-							"diskSizeGB": "[parameters('mdtSize')]",
-							"createOption": "Empty",
-							"caching": "None"
-						}
-					]
-				},
 				"osProfile": {
 					"computerName": "[concat(parameters('vmNamePrefix'),'-mgs')]",
 					"adminUsername": "[parameters('adminUsername')]",
 					"adminPassword": "[parameters('adminPassword')]",
 					"linuxConfiguration": {
-						"disablePasswordAuthentication": false
+						"disablePasswordAuthentication": false,
+						"ssh": {
+							"publicKeys": [
+								{
+									"path": "[variables('sshKeyPath')]",
+									"keyData": "[parameters('sshKeyData')]"
+								}
+							]
+						}
 					}
+				},
+				"storageProfile": {
+					"imageReference": "[variables('imageReference')[parameters('hostOS')]]",
+					"osDisk": {
+						"name": "[concat(parameters('vmNamePrefix'), '-mgs', '_OSDisk')]",
+						"caching": "ReadWrite",
+						"createOption": "FromImage"
+					},
+					"dataDisks": [
+						{
+							"name": "[concat(parameters('vmNamePrefix'), '-mgs', '_DataDisk1')]",
+							"diskSizeGB": "[parameters('mdtSize')]",
+							"lun": 0,
+							"caching": "None",
+							"createOption": "Empty"
+						}
+					]
 				},
 				"networkProfile": {
 					"networkInterfaces": [
@@ -369,11 +376,6 @@
 							"id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('vmNamePrefix'),'-mgs'))]"
 						}
 					]
-				},
-				"diagnosticsProfile": {
-					"bootDiagnostics": {
-						"enabled": false
-					}
 				}
 			}
 		},
@@ -426,16 +428,13 @@
 			}
 		},
 		{
+			"apiVersion": "2017-03-30",
 			"type": "Microsoft.Compute/virtualMachines",
-			"apiVersion": "2019-07-01",
 			"name": "[concat(parameters('vmNamePrefix'), '-mds', copyIndex())]",
 			"location": "[parameters('location')]",
 			"dependsOn": [
 				"storageAccountsCopy",
 				"[concat('Microsoft.Network/networkInterfaces/', parameters('vmNamePrefix'), '-mds', copyIndex())]"
-			],
-			"zones": [
-				"1"
 			],
 			"copy": {
 				"name": "mdsVmCopy",
@@ -448,18 +447,20 @@
 				"hardwareProfile": {
 					"vmSize": "[parameters('mdsVmSize')]"
 				},
+				"osProfile": {
+					"computerName": "[concat(parameters('vmNamePrefix'), '-mds', copyIndex())]",
+					"adminUsername": "[parameters('adminUsername')]",
+					"adminPassword": "[parameters('adminPassword')]",
+					"linuxConfiguration": {
+						"disablePasswordAuthentication": false
+					}
+				},
 				"storageProfile": {
-					"imageReference": {
-						"publisher": "OpenLogic",
-						"offer": "CentOS",
-						"sku": "8_2",
-						"version": "latest"
-					},
+					"imageReference": "[variables('imageReference')[parameters('hostOS')]]",
 					"osDisk": {
-						"osType": "Linux",
 						"name": "[concat(parameters('vmNamePrefix'), '-mds', copyIndex(),'_OSDisk')]",
-						"createOption": "FromImage",
-						"caching": "ReadWrite"
+						"caching": "ReadWrite",
+						"createOption": "FromImage"
 					},
 					"copy": [
 						{
@@ -475,25 +476,12 @@
 						}
 					]
 				},
-				"osProfile": {
-					"computerName": "[concat(parameters('vmNamePrefix'), '-mds', copyIndex())]",
-					"adminUsername": "[parameters('adminUsername')]",
-					"adminPassword": "[parameters('adminPassword')]",
-					"linuxConfiguration": {
-						"disablePasswordAuthentication": false
-					}
-				},
 				"networkProfile": {
 					"networkInterfaces": [
 						{
 							"id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('vmNamePrefix'), '-mds', copyIndex()))]"
 						}
 					]
-				},
-				"diagnosticsProfile": {
-					"bootDiagnostics": {
-						"enabled": false
-					}
 				}
 			}
 		},
@@ -530,7 +518,7 @@
 			"location": "[parameters('location')]",
 			"dependsOn": [
 				"[concat('Microsoft.Resources/deployments/', 'vnet')]",
-				"[concat('Microsoft.Network/networkInterfaces/', parameters('vmNamePrefix'), '-mds0')]" //if ossCount > 1 this fails
+				"[concat('Microsoft.Network/networkInterfaces/', parameters('vmNamePrefix'), '-mds', copyIndex())]"
 			],
 			"copy": {
 				"name": "ossNicCopy",
@@ -551,16 +539,13 @@
 			}
 		},
 		{
+			"apiVersion": "2017-03-30",
 			"type": "Microsoft.Compute/virtualMachines",
-			"apiVersion": "2019-07-01",
 			"name": "[concat(parameters('vmNamePrefix'), '-oss', copyIndex())]",
 			"location": "[parameters('location')]",
 			"dependsOn": [
 				"storageAccountsCopy",
 				"[concat('Microsoft.Network/networkInterfaces/', parameters('vmNamePrefix'), '-oss', copyIndex())]"
-			],
-			"zones": [
-				"1"
 			],
 			"copy": {
 				"name": "ossVmCopy",
@@ -573,18 +558,20 @@
 				"hardwareProfile": {
 					"vmSize": "[parameters('ossVmSize')]"
 				},
+				"osProfile": {
+					"computerName": "[concat(parameters('vmNamePrefix'), '-oss', copyIndex())]",
+					"adminUsername": "[parameters('adminUsername')]",
+					"adminPassword": "[parameters('adminPassword')]",
+					"linuxConfiguration": {
+						"disablePasswordAuthentication": false
+					}
+				},
 				"storageProfile": {
-					"imageReference": {
-						"publisher": "OpenLogic",
-						"offer": "CentOS",
-						"sku": "8_2",
-						"version": "latest"
-					},
+					"imageReference": "[variables('imageReference')[parameters('hostOS')]]",
 					"osDisk": {
-						"osType": "Linux",
 						"name": "[concat(parameters('vmNamePrefix'), '-oss', copyIndex(),'_OSDisk')]",
-						"createOption": "FromImage",
-						"caching": "ReadWrite"
+						"caching": "ReadWrite",
+						"createOption": "FromImage"
 					},
 					"copy": [
 						{
@@ -600,25 +587,12 @@
 						}
 					]
 				},
-				"osProfile": {
-					"computerName": "[concat(parameters('vmNamePrefix'), '-oss', copyIndex())]",
-					"adminUsername": "[parameters('adminUsername')]",
-					"adminPassword": "[parameters('adminPassword')]",
-					"linuxConfiguration": {
-						"disablePasswordAuthentication": false
-					}
-				},
 				"networkProfile": {
 					"networkInterfaces": [
 						{
 							"id": "[resourceId('Microsoft.Network/networkInterfaces',concat(parameters('vmNamePrefix'), '-oss', copyIndex()))]"
 						}
 					]
-				},
-				"diagnosticsProfile": {
-					"bootDiagnostics": {
-						"enabled": false
-					}
 				}
 			}
 		},

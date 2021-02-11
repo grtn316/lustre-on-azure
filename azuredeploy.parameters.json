@@ -6,28 +6,13 @@
             "value": "https://raw.githubusercontent.com/lustrehpc/azure-quickstart-templates/master/101-lustre-client-server-create"
         },
         "location": {
-            "value": "Japan East"
+            "value": "EastUS2"
         },
 		"adminUsername": {
             "value": "azureuser"
         },
         "dnsNamePrefix": {
             "value": "uniqdnsname"
-        },
-        "existingSubnetClientsName": { 
-            "value": "subnet-lustre-clients"
-        },
-        "vnetName": {
-            "value": "vnettest"
-		},
-        "clientlocation": {
-            "value": "Japan East"
-        },
-		"clientadminUsername": {
-            "value": "azureclientuser"
-        },
-        "dnsNamePrefixForClient": {
-            "value": "clntdnsname"
-        }	
+        }
 	}
 }

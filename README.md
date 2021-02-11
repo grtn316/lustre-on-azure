@@ -16,6 +16,9 @@ This template provides Automated Lustre server deployment on Azure and create Lu
 - Clustered OSS/OST and MDS/MDT with ldiskfs
 
 ---
-# Original code and refferences
+# Original code and references
 
 https://github.com/Azure/azure-quickstart-templates/tree/master/intel-lustre-client-server
+
+# CLI Deployment
+`az deployment group create --resource-group dab-lustre-eus --template-file azuredeploy.json`
